@@ -48,42 +48,43 @@ inline std::vector<LZ77Code> lz77_encode(const std::vector<uint8_t>& vSignal, si
 	// tant qu'il reste de quoi a traiter (il reste des valeurs dans la fenetre droite)
 	while (vWindow.size() > n1) {
 		LZ77Code lz = LZ77Code();
-		lz.nIdx = 1;
-		lz.nLength = 0;
-
+		
+		LZ77Code bestLz = LZ77Code();
+		
 		uint8_t val = vWindow[n1]; //premiere valeur de fenetre droite
 
+		// initialisation des lz77
+		lz.nIdx = 1;
+		lz.nLength = 0;
+		// le meilleur cas de base, c'est de ne pas le trouver
+		bestLz.nIdx = 0;
+		bestLz.nLength = 0;
+		bestLz.nNextSymbol = val;
+
 		// trouver l'index de cette valeur dans le fenetre gauche si elle est presente
-		while (lz.nIdx < n1 && vWindow[n1 - lz.nIdx] != val) {
+		while (lz.nIdx < n1) {
+
+			// si on l'a trouve
+			if (vWindow[n1 - lz.nIdx] == val) {
+				// determiner quel longueur
+				// tant que les valeurs correspondent et qu'on n'est pas a la fin de la fenetre
+				while (lz.nLength < n2 && vWindow[n1 - lz.nIdx + lz.nLength] == vWindow[n1 + lz.nLength]) {
+					lz.nLength++;
+				}
+
+				// on garde la prochaine non-trouve
+				lz.nNextSymbol = vWindow[n1 + lz.nLength];
+
+				if (bestLz.nLength < lz.nLength) {
+					bestLz = lz;
+					lz.nLength = 0;
+				}
+			}
 			lz.nIdx++;
 		}
 
-		// si on l'a trouve
-		if (vWindow[n1 - lz.nIdx] == val) {
-			// determiner quel longueur
-			// tant que les valeurs correspondent et qu'on n'est pas a la fin de la fenetre
-			while (lz.nLength < n2 && vWindow[n1 - lz.nIdx + lz.nLength] == vWindow[n1 + lz.nLength]) {
-				lz.nLength++;
-			}
-
-			// on garde la prochaine non-trouve
-			lz.nNextSymbol = vWindow[n1 + lz.nLength];
-
-			// on bouge de lz.nLength + 1
-			for (uint8_t i = 0; i < lz.nLength+1; ++i) {
-				if (!vSignalCopy.empty()) {
-					vWindow.push_back(vSignalCopy.back());
-					vSignalCopy.pop_back();
-				}		
-				vWindow.erase(vWindow.begin());
-			}			
-		}
-		// sinon, on n'a pas trouve
-		else {
-			lz.nIdx = 0;
-			lz.nLength = 0;
-			lz.nNextSymbol = val;
-			// on bouge de 1
+		// on bouge de lz.nLength + 1
+		for (uint8_t i = 0; i < bestLz.nLength + 1; ++i) {
 			if (!vSignalCopy.empty()) {
 				vWindow.push_back(vSignalCopy.back());
 				vSignalCopy.pop_back();
@@ -92,7 +93,7 @@ inline std::vector<LZ77Code> lz77_encode(const std::vector<uint8_t>& vSignal, si
 		}
 
 		// ajout du triplet
-		vCode.push_back(lz);
+		vCode.push_back(bestLz);
 	}
 	
     return vCode;
@@ -105,6 +106,32 @@ inline std::vector<uint8_t> lz77_decode(const std::vector<LZ77Code>& vCode, size
 	// N = taille total de la fenetre glissante
 	// n1 = taille du buffer gauche de la fenetre glissante
     // ... @@@@@ TODO (decode vCode triplets using lz77, and put original values in vSignal)
+	std::vector<uint8_t> vWindow = std::vector<uint8_t>();
+
+	// fenetre gauche rempli de 0
+	for (size_t i = 0; i < n1; ++i) {
+		vWindow.push_back(0);
+	}
+
+	for (auto it = vCode.begin(); it != vCode.end(); it++) {
+		LZ77Code lz = *it;
+		// aller a index ( si zero, skip lecture du window)
+		if (lz.nIdx != 0) {
+			// Ajouter les lenght prochains symboles au dictionnaire et au signal
+			for (uint8_t i = 0; i < lz.nLength; ++i) {
+				uint8_t value = vWindow[n1 - lz.nIdx];
+				vWindow.push_back(value);
+				vWindow.erase(vWindow.begin());
+				vSignal.push_back(value);
+			}
+		}
+		// ajouter next symbol a la fin (au signal et dans le window)
+		uint8_t value = lz.nNextSymbol;
+		vWindow.push_back(value);
+		vWindow.erase(vWindow.begin());
+		vSignal.push_back(value);
+	}
+
     return vSignal;
 }
 
@@ -112,7 +139,27 @@ inline std::vector<uint8_t> format_signal(const cv::Mat& oInputImage) {
     CV_Assert(!oInputImage.empty() && oInputImage.isContinuous() && (oInputImage.type()==CV_8UC1 || oInputImage.type()==CV_8UC3));
     std::vector<uint8_t> vSignal;
     // ... @@@@@ TODO (put oInputImage data in vSignal in correct order/format)
-    return vSignal;
+	cv::Mat oInputImageCopy = oInputImage;
+	if (oInputImageCopy.type() == CV_8UC1)
+	{
+		vSignal.assign(oInputImageCopy.datastart, oInputImageCopy.dataend);
+	}
+	else
+	{
+		std::vector<cv::Mat> voChannels(3);
+		
+		//cv::split(oInputImageCopy, voChannels);
+		//oInputImageCopy.
+		/*
+		//auto it = vSignal.begin();
+		for (size_t i = 0; i < 3; ++i) {
+			cv::extractChannel(oInputImageCopy, voChannels.at(i), 0);
+			vSignal.insert(it, voChannels.at(i).datastart, voChannels.at(i).dataend);
+			it = vSignal.end();
+		}
+	}*/
+
+	return vSignal;
 }
 
 inline cv::Mat reformat_image(const std::vector<uint8_t>& vSignal, const cv::Size& oOrigImageSize) {
