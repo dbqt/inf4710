@@ -27,11 +27,14 @@ inline std::vector<LZ77Code> lz77_encode(const std::vector<uint8_t>& vSignal, si
     std::vector<LZ77Code> vCode;
     // ... @@@@@ TODO (encode vSignal using lz77, and put triplets in vCode)
 
+	std::cout << "Start Encode" << std::endl;
+	
 	// N = taille total de la fenetre glissante
 	// n1 = taille du buffer gauche de la fenetre glissante
 	size_t n2 = N - n1; // taille du buffer droit de la fenetre glissante
 	std::vector<uint8_t> vSignalCopy = vSignal; // copie du vector du signal
 	std::vector<uint8_t> vWindow = std::vector<uint8_t>(); 
+
 	// fenetre gauche rempli de 0
 	for (size_t i = 0; i < n1; ++i) {
 		vWindow.push_back(0);
@@ -42,36 +45,54 @@ inline std::vector<LZ77Code> lz77_encode(const std::vector<uint8_t>& vSignal, si
 		vSignalCopy.pop_back();
 	}
 
-	while (!vSignalCopy.empty) {
-		LZ77Code next = LZ77Code();
+	// tant qu'il reste de quoi a traiter (il reste des valeurs dans la fenetre droite)
+	while (vWindow.size() > n1) {
+		LZ77Code lz = LZ77Code();
+		lz.nIdx = 1;
+		lz.nLength = 0;
 
-		//lire prochaine valeur de la fenetre droite
-		uint8_t val = vWindow[n1];
-		//chercher index la valeur dans la fenetre a reculons
-		next.nIdx = 0;
-		while(vWindow[n1 - next.nIdx] != val) {
-			next.nIdx++;
-			if (next.nIdx >= n1) {
-				// pas trouve
-				next.nIdx = 0;
-				break;
+		uint8_t val = vWindow[n1]; //premiere valeur de fenetre droite
+
+		// trouver l'index de cette valeur dans le fenetre gauche si elle est presente
+		while (lz.nIdx < n1 && vWindow[n1 - lz.nIdx] != val) {
+			lz.nIdx++;
+		}
+
+		// si on l'a trouve
+		if (vWindow[n1 - lz.nIdx] == val) {
+			// determiner quel longueur
+			// tant que les valeurs correspondent et qu'on n'est pas a la fin de la fenetre
+			while (lz.nLength < n2 && vWindow[n1 - lz.nIdx + lz.nLength] == vWindow[n1 + lz.nLength]) {
+				lz.nLength++;
 			}
-		}
-		
-		//tant que fenetre(index+1) == vecteur(index1), incrementer length
-		while (vWindow[n1 - (next.nIdx-next.nLength)] == vWindow[n1 + next.nLength] && next.nLength < n2) {
-			next.nLength++;
-		}
-		// lz77code.nNextSymbol = derniere valeur lu du vecteur
-		if (next.nLength < n2) {
-			next.nNextSymbol = vWindow[n1 + next.nLength];
-		}
-		else {
-			next.nNextSymbol = 
-		}
-		// prendre length valeurs du vecteur et mettre dans fenetre
 
-		vCode.push_back(next);
+			// on garde la prochaine non-trouve
+			lz.nNextSymbol = vWindow[n1 + lz.nLength];
+
+			// on bouge de lz.nLength + 1
+			for (uint8_t i = 0; i < lz.nLength+1; ++i) {
+				if (!vSignalCopy.empty()) {
+					vWindow.push_back(vSignalCopy.back());
+					vSignalCopy.pop_back();
+				}		
+				vWindow.erase(vWindow.begin());
+			}			
+		}
+		// sinon, on n'a pas trouve
+		else {
+			lz.nIdx = 0;
+			lz.nLength = 0;
+			lz.nNextSymbol = val;
+			// on bouge de 1
+			if (!vSignalCopy.empty()) {
+				vWindow.push_back(vSignalCopy.back());
+				vSignalCopy.pop_back();
+			}
+			vWindow.erase(vWindow.begin());
+		}
+
+		// ajout du triplet
+		vCode.push_back(lz);
 	}
 	
     return vCode;

@@ -4,6 +4,49 @@
 using ImagePathFlag = std::pair<std::string,int>; // first = image path, second = cv::imread flag
 
 int main(int /*argc*/, char** /*argv*/) {
+	// Exemple du tp
+	std::vector<uint8_t>* signal = new std::vector<uint8_t>();
+	//001 010 210 210 212 401 010 2100
+	signal->push_back(0);
+	signal->push_back(0);
+	signal->push_back(1);
+	signal->push_back(2);
+
+	signal->push_back(0);
+	signal->push_back(1);
+	signal->push_back(0);
+
+	signal->push_back(1);
+	signal->push_back(0);
+	signal->push_back(4);
+
+	signal->push_back(2);
+	signal->push_back(1);
+	signal->push_back(2);
+
+	signal->push_back(0);
+	signal->push_back(1);
+	signal->push_back(2);
+
+	signal->push_back(0);
+	signal->push_back(1);
+	signal->push_back(2);
+
+	signal->push_back(0);
+	signal->push_back(1);
+	signal->push_back(0);
+
+	signal->push_back(1);
+	signal->push_back(0);
+	signal->push_back(0);
+
+	for (auto it = signal->end()-1; it != signal->begin(); it--) {
+		std::cout << (int)(*it);
+	}
+	std::cout << std::endl;
+	std::vector<LZ77Code> v = lz77_encode(*signal, 18, 9);
+
+	/*
     try {
         // note: by default, imread always returns 3-ch images unless the cv::IMREAD_GRAYSCALE flag is set (here we hardcode it based on prior knowledge)
         const std::vector<ImagePathFlag> vsTestImages = {
@@ -35,6 +78,6 @@ int main(int /*argc*/, char** /*argv*/) {
     }
     catch(...) {
         std::cerr << "Caught unhandled exception." << std::endl;
-    }
+    }*/
     return 0;
 }
